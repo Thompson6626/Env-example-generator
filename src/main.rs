@@ -6,6 +6,7 @@ use std::path::Path;
 use crate::argc::argc_app;
 pub use self::error::{Error, Result};
 use std::io::Write;
+use std::process;
 
 mod argc;
 mod error;
@@ -13,7 +14,7 @@ mod error;
 struct Options {
     input_file: String,
     output_file: String,
-    keep_comments: bool,
+    omit_comments: bool,
     overwrite: bool
 }
 
@@ -32,20 +33,19 @@ impl Options {
             .to_owned();
 
 
-        let keep_comments = argc.get_flag("keep-comments");
+        let omit_comments = argc.get_flag("omit-comments");
 
         let overwrite = argc.get_flag("overwrite");
 
         Ok(Options {
             input_file,
             output_file,
-            keep_comments,
+            omit_comments,
             overwrite
         })
     }
 }
 
-use std::process;
 
 fn main() {
     let argc = argc_app().get_matches();
@@ -77,17 +77,21 @@ fn exec(options: Options) -> Result<()> {
         return Err(Error::InputFileNotFound(options.input_file));
     }
 
+    if !output_path.exists() {
+        fs::File::create(&output_path).expect("Failed to create file");
+    }
+
     // Read the .env file
     let contents = fs::read_to_string(input_path)
         .map_err(|e| Error::EnvFileReadError(format!("{}: {}", options.input_file, e)))?;
 
     let processed = if options.overwrite {
-        overwrite_env_file(&contents, options.keep_comments)
+        overwrite_env_file(&contents, options.omit_comments)
     } else {
         let example_contents = fs::read_to_string(output_path)
             .map_err(|e | Error::EnvFileReadError(format!("{}: {}", options.output_file, e)))?;
 
-        process_env_file(&contents, &example_contents, options.keep_comments)
+        process_env_file(&contents, &example_contents, options.omit_comments)
     };
 
     // Write to .env.example
@@ -113,45 +117,30 @@ fn exec(options: Options) -> Result<()> {
 }
 
 /// Parses `.env` content, extracting only variable keys while preserving comments if required.
-fn overwrite_env_file(contents: &str, keep_comments: bool) -> String {
-    collect_keys(contents,keep_comments)
-        .collect::<Vec<_>>()
-        .join("\n") // So that they are in new lines
+fn overwrite_env_file(contents: &str, omit_comments: bool) -> String {
+    collect_keys(contents, omit_comments, false).join("\n")
 }
 
-fn process_env_file(contents: &str, example_contents: &str, keep_comments: bool) -> String {
-    let env_keys: HashSet<String> = collect_keys(contents, keep_comments).collect();
-    let example_keys: HashSet<String> = collect_keys(example_contents, keep_comments).collect();
+fn process_env_file(contents: &str, example_contents: &str, omit_comments: bool) -> String {
+    let env_keys: HashSet<_> = collect_keys(contents, omit_comments, false).into_iter().collect();
+    let example_keys: HashSet<_> = collect_keys(example_contents, omit_comments, true).into_iter().collect();
 
-    println!("{:?}", env_keys);
-    println!("{:?}", example_keys);
-
-    let difference: Vec<_> = env_keys.difference(&example_keys).cloned().collect();
-
-    println!("{:?}", difference);
-
-    difference.join("\n")
+    env_keys.difference(&example_keys).cloned().collect::<Vec<_>>().join("\n")
 }
 
-fn collect_keys<'a>(content: &'a str, keep_comments: bool) -> impl Iterator<Item = String> + 'a {
+fn collect_keys(content: &str, omit_comments: bool, keep_values: bool) -> Vec<String> {
     content
         .lines()
-        .filter_map(move |line| {
+        .filter_map(|line| {
             let trimmed = line.trim();
 
-            if trimmed.is_empty() {
-                Some(String::new()) // Keep empty lines
-            } else if trimmed.starts_with('#') {
-                if keep_comments {
-                    Some(line.to_string()) // Preserve comments if enabled
-                } else {
-                    None // Remove comments if not needed
-                }
-            } else if let Some((key, _)) = trimmed.split_once('=') {
-                Some(key.trim().to_string()) // Store only the key (without `=`)
-            } else {
-                None // Ignore malformed lines
+            match trimmed {
+                "" => Some(String::new()), // Keep empty lines
+                _ if trimmed.starts_with('#') => (!omit_comments).then(|| line.to_string()), // Keep/remove comments
+                _ if keep_values => Some(trimmed.to_string()), // Preserve full line for example file
+                _ => trimmed.split_once('=').map(|(key, _)| key.trim().to_string()), // Store only keys
             }
         })
+        .collect()
 }
 

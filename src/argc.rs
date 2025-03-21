@@ -20,9 +20,10 @@ pub fn argc_app() -> Command {
                 .default_value(".env.example")
         )
         .arg(
-            Arg::new("keep-comments")
-                .long("keep-comments") // --keep-comments
-                .help("Keep comments from .env in the .env.example file")
+            Arg::new("omit-comments")
+                .short('c') // -c
+                .long("omit-comments") // --omit-comments
+                .help("Omit comments from .env in the .env.example file")
                 .action(clap::ArgAction::SetTrue),
         ).arg(
             Arg::new("overwrite")

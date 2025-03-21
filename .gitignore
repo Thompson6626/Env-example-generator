@@ -24,3 +24,6 @@ Cargo.lock
 
 .env
 .env.example
+test.env
+test.env.example
+env-cli.tape

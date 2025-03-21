@@ -3,6 +3,20 @@ name = "ghostenv"
 version = "0.1.0"
 edition = "2024"
 
+keywords = [
+    "cli",
+    "directory"
+]
+categories = ["command-line-interface"]
+
+[[bin]]
+name = "genv"
+path = "src/main.rs"
+
+
+[lints.rust]
+unsafe_code = "forbid"
+
 [dependencies]
 clap =  {version = "4.5.32" , features = ["cargo"]}
 derive_more = { version ="2.0.1", features = ["from", "display"] }
