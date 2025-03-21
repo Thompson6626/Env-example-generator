@@ -1,7 +1,7 @@
 # genv
 
 ## Overview
-`genv` is a command-line tool to generate and/or update a `.env.example` file from an existing `.env` file. It helps maintain consistency in environment variables across different environments.
+`genv` is a command-line tool to generate and/or update a `.env.example` file from an existing `.env` file.
 
 ## Installation
 To use `genv`, ensure you have Rust installed, then build the project:
